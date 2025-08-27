@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -7,108 +7,136 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #f5f5f5;
+            background-color: #f0f2f5;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
             color: #333;
         }
-
         .container {
-            max-width: 500px;
-            margin: 0 auto;
             background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 450px;
         }
-
         h1 {
             text-align: center;
             color: #4CAF50;
+            margin-bottom: 20px;
         }
-
         .input-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
-
         input, textarea, button {
             width: 100%;
-            padding: 12px;
-            margin: 5px 0;
+            padding: 14px;
+            margin: 8px 0;
             border: 1px solid #ddd;
-            border-radius: 8px;
+            border-radius: 10px;
             box-sizing: border-box;
             font-size: 16px;
+            transition: all 0.3s ease;
         }
-
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
         button {
             background-color: #4CAF50;
             color: white;
             border: none;
             cursor: pointer;
             font-weight: bold;
+            margin-top: 10px;
         }
-
-            button:hover {
-                background-color: #45a049;
-            }
-
-        #remindersList {
-            margin-top: 20px;
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
         }
-
-        .reminder-item {
-            background: #f9f9f9;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            border-left: 4px solid #4CAF50;
+        button:active {
+            transform: translateY(0);
+        }
+        #statusMessage {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+            color: #4CAF50;
+            min-height: 20px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📝 Мои Напоминания</h1>
-
+        
         <div class="input-group">
-            <input type="datetime-local" id="reminderDate">
-            <textarea id="reminderText" placeholder="О чем напомнить?" rows="3"></textarea>
+            <input type="datetime-local" id="reminderDate" required>
+            <textarea id="reminderText" placeholder="О чем напомнить?" rows="3" required></textarea>
             <button onclick="setReminder()">Установить напоминание</button>
         </div>
 
-        <div id="remindersList">
-            <h3>Ваши напоминания:</h3>
-            <!-- Сюда будут добавляться напоминания -->
-        </div>
+        <div id="statusMessage"></div>
+        <!-- Сообщения о статусе будут здесь -->
     </div>
 
     <script>
-        // Эта переменная нужна для общения с Telegram
+        // Инициализируем WebApp Telegram
         let tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем на весь экран
+        tg.BackButton.show(); // Показываем кнопку "Назад"
+        tg.BackButton.onClick(() => tg.close()); // Закрываем WebApp по нажатию "Назад"
 
-        // Функция для установки напоминания
+        // Главная функция установки напоминания
         function setReminder() {
-            const date = document.getElementById('reminderDate').value;
-            const text = document.getElementById('reminderText').value;
+            const dateInput = document.getElementById('reminderDate');
+            const textInput = document.getElementById('reminderText');
+            const statusElement = document.getElementById('statusMessage');
 
+            const date = dateInput.value;
+            const text = textInput.value.trim();
+
+            // Проверяем, все ли заполнено
             if (!date || !text) {
-                alert("Заполните дату и текст!");
+                statusElement.textContent = '❌ Заполните все поля!';
+                statusElement.style.color = '#f44336';
                 return;
             }
 
-            // Отправляем данные НАЗАД боту
-            tg.sendData(JSON.stringify({
+            // Показываем пользователю, что идет отправка
+            statusElement.textContent = '⏳ Отправляем данные боту...';
+            statusElement.style.color = '#FF9800';
+
+            // Формируем данные для отправки
+            const data = {
                 date: date,
                 text: text
-            }));
+            };
 
-            // Закрываем веб-приложение после отправки
-            tg.close();
+            // ОТПРАВЛЯЕМ ДАННЫЕ БОТУ - КЛЮЧЕВАЯ СТРОКА!
+            tg.sendData(JSON.stringify(data));
+
+            // Сообщаем пользователю об успехе и закрываем приложение
+            statusElement.textContent = '✅ Напоминание установлено! Закрываем окно...';
+            statusElement.style.color = '#4CAF50';
+
+            // Даем пользователю прочитать сообщение и закрываем окно
+            setTimeout(() => {
+                tg.close();
+            }, 1500);
         }
 
-        // Показываем кнопку "Закрыть" от Telegram
-        tg.BackButton.show();
-        tg.BackButton.onClick(() => tg.close());
+        // Делаем кнопку активной по нажатию Enter в текстовом поле
+        document.getElementById('reminderText').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setReminder();
+            }
+        });
     </script>
 </body>
 </html>
