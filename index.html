@@ -85,31 +85,23 @@
     </div>
 
     <script>
-        // === Эмуляция Telegram API для теста в браузере ===
-        if (!window.Telegram) {
-            window.Telegram = {
-                WebApp: {
-                    expand: () => console.log("expand()"),
-                    close: () => console.log("close()"),
-                    BackButton: {
-                        show: () => console.log("BackButton.show()"),
-                        onClick: (fn) => console.log("BackButton.onClick() подключен")
-                    },
-                    sendData: (data) => console.log("📤 Данные отправлены:", data)
-                }
-            };
-            console.warn("⚠️ Работает в режиме теста (браузер). В Telegram API будет реальным.");
-        }
-
+        // Проверка Telegram API
         let tg = window.Telegram?.WebApp;
 
         if (tg) {
             tg.expand();
             tg.BackButton.show();
             tg.BackButton.onClick(() => tg.close());
+        } else {
+            console.warn("⚠️ Запущено вне Telegram. API недоступно.");
+            // Для теста в браузере эмулируем Telegram.WebApp
+            tg = {
+                sendData: (data) => console.log("📤 Данные отправлены:", data),
+                close: () => console.log("📥 Окно закрыто (только тест)"),
+                BackButton: { show: () => {}, onClick: () => {} }
+            };
         }
 
-        // === Главная функция установки напоминания ===
         function setReminder() {
             const dateInput = document.getElementById('reminderDate');
             const textInput = document.getElementById('reminderText');
@@ -128,19 +120,16 @@
             statusElement.style.color = '#FF9800';
 
             const data = { date: date, text: text };
+            console.log("➡️ Отправляем данные:", data);
 
-            console.log("Отправляем данные:", data); // лог для отладки
             tg.sendData(JSON.stringify(data));
 
-            statusElement.textContent = '✅ Напоминание установлено! Закрываем окно...';
+            statusElement.textContent = '✅ Напоминание установлено!';
             statusElement.style.color = '#4CAF50';
 
-            setTimeout(() => {
-                tg.close();
-            }, 1500);
+            setTimeout(() => tg.close(), 1500);
         }
 
-        // Нажатие Enter в поле текста
         document.getElementById('reminderText').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 setReminder();
