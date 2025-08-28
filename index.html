@@ -1,140 +1,151 @@
-import logging
-import json
-from datetime import datetime
-from dateutil import parser
-from telegram import Update, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-from telegram import ReplyKeyboardMarkup, KeyboardButton
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои Напоминания</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 450px;
+        }
+        h1 {
+            text-align: center;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 14px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        #statusMessage {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+            color: #4CAF50;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Мои Напоминания</h1>
+        
+        <div class="input-group">
+            <input type="datetime-local" id="reminderDate" required>
+            <textarea id="reminderText" placeholder="О чем напомнить?" rows="3" required></textarea>
+            <button onclick="setReminder()">Установить напоминание</button>
+        </div>
 
-#Настройки
-TOKEN = "8482974728:AAG2iXGMwBpRxAxzIXSt_jLbGq_jZ6_Mf2g"  # Замените на ваш реальный токен!
-WEB_APP_URL = "https://mentalist999.github.io/Nots_bot./"  # Ваша ссылка на GitHub Pages
+        <div id="statusMessage"></div>
+    </div>
 
-# Настройка логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+    <script>
+        // === Эмуляция Telegram API для теста в браузере ===
+        if (!window.Telegram) {
+            window.Telegram = {
+                WebApp: {
+                    expand: () => console.log("expand()"),
+                    close: () => console.log("close()"),
+                    BackButton: {
+                        show: () => console.log("BackButton.show()"),
+                        onClick: (fn) => console.log("BackButton.onClick() подключен")
+                    },
+                    sendData: (data) => console.log("📤 Данные отправлены:", data)
+                }
+            };
+            console.warn("⚠️ Работает в режиме теста (браузер). В Telegram API будет реальным.");
+        }
 
+        let tg = window.Telegram?.WebApp;
 
-# ===== КЛАВИАТУРА С WEB-APP КНОПКОЙ =====
-def web_app_keyboard():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("📋 Открыть меню напоминаний", web_app=WebAppInfo(url=WEB_APP_URL))]
-    ], resize_keyboard=True, one_time_keyboard=True)
+        if (tg) {
+            tg.expand();
+            tg.BackButton.show();
+            tg.BackButton.onClick(() => tg.close());
+        }
 
+        // === Главная функция установки напоминания ===
+        function setReminder() {
+            const dateInput = document.getElementById('reminderDate');
+            const textInput = document.getElementById('reminderText');
+            const statusElement = document.getElementById('statusMessage');
 
-# ===== КОМАНДА /start =====
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.info(f"User {update.effective_user.id} started the bot")
-    await update.message.reply_text(
-        f"Привет, {update.effective_user.first_name}! 🎯\n"
-        "Нажми кнопку ниже, чтобы установить напоминание в удобном меню.",
-        reply_markup=web_app_keyboard()
-    )
+            const date = dateInput.value;
+            const text = textInput.value.trim();
 
+            if (!date || !text) {
+                statusElement.textContent = '❌ Заполните все поля!';
+                statusElement.style.color = '#f44336';
+                return;
+            }
 
-# ===== ОБРАБОТКА ДАННЫХ ИЗ WEB-APP =====
-async def handle_web_app_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Эта функция принимает данные из веб-приложения"""
-    logger.info(f"Received web app data from user {update.effective_user.id}")
+            statusElement.textContent = '⏳ Отправляем данные боту...';
+            statusElement.style.color = '#FF9800';
 
-    # Проверяем, что сообщение содержит данные из веб-приложения
-    if not update.message or not update.message.web_app_data:
-        logger.warning("No web app data found")
-        return
+            const data = { date: date, text: text };
 
-    try:
-        # Парсим данные из JSON
-        data = json.loads(update.message.web_app_data.data)
-        logger.info(f"Parsed data: {data}")
+            console.log("Отправляем данные:", data); // лог для отладки
+            tg.sendData(JSON.stringify(data));
 
-        reminder_date = parser.parse(data['date'])
-        reminder_text = data['text']
+            statusElement.textContent = '✅ Напоминание установлено! Закрываем окно...';
+            statusElement.style.color = '#4CAF50';
 
-        # Вычисляем, через сколько секунд сработает напоминание
-        now = datetime.now()
-        delay = (reminder_date - now).total_seconds()
-        logger.info(f"Reminder set for {reminder_date} (in {delay} seconds)")
+            setTimeout(() => {
+                tg.close();
+            }, 1500);
+        }
 
-        # Проверяем, что время в будущем
-        if delay < 0:
-            error_msg = "⏳ Нельзя установить напоминание в прошлом!"
-            logger.warning(error_msg)
-            await update.message.reply_text(error_msg)
-            return
-
-        # Ставим напоминание в очередь
-        job_name = f"reminder_{update.effective_chat.id}_{datetime.now().timestamp()}"
-        context.job_queue.run_once(
-            send_reminder,
-            delay,
-            chat_id=update.effective_chat.id,
-            data=reminder_text,
-            name=job_name
-        )
-
-        # Подтверждаем пользователю
-        success_msg = (
-            f"✅ **Напоминание установлено!**\n\n"
-            f"**Время:** {reminder_date.strftime('%d.%m.%Y в %H:%M')}\n"
-            f"**Текст:** {reminder_text}\n\n"
-            f"Я пришлю вам сообщение в указанное время!"
-        )
-        await update.message.reply_text(success_msg, parse_mode='Markdown')
-        logger.info("Reminder successfully set")
-
-    except (KeyError, ValueError, json.JSONDecodeError) as e:
-        error_msg = f"❌ Ошибка обработки данных: {e}"
-        logger.error(error_msg)
-        await update.message.reply_text("❌ Произошла ошибка. Попробуйте еще раз.")
-
-
-# ===== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ =====
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Эта функция обрабатывает ВСЕ текстовые сообщения"""
-    logger.info(f"Received message from user {update.effective_user.id}")
-
-    # Если это данные из веб-приложения - обрабатываем их
-    if update.message and update.message.web_app_data:
-        await handle_web_app_data(update, context)
-    else:
-        # Если это обычное сообщение - показываем подсказку
-        await update.message.reply_text(
-            "Нажмите кнопку '📋 Открыть меню напоминаний' для работы с ботом!",
-            reply_markup=web_app_keyboard()
-        )
-
-
-# ===== ФУНКЦИЯ ОТПРАВКИ НАПОМИНАНИЯ =====
-async def send_reminder(context: ContextTypes.DEFAULT_TYPE):
-    job = context.job
-    logger.info(f"Sending reminder to chat {job.chat_id}")
-    await context.bot.send_message(
-        job.chat_id,
-        text=f"🔔 **НАПОМИНАНИЕ**\n\n{job.data}",
-        parse_mode='Markdown'
-    )
-
-
-# ===== ЗАПУСК БОТА =====
-def main():
-    application = Application.builder().token(TOKEN).build()
-
-    # Обработчик команды /start
-    application.add_handler(CommandHandler("start", start))
-
-    # Обработчик данных из WebApp
-    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_web_app_data))
-
-    # Обработчик обычных сообщений
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    logger.info("Бот запускается...")
-    application.run_polling()
-
-
-
-if __name__ == "__main__":
-    main()
+        // Нажатие Enter в поле текста
+        document.getElementById('reminderText').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setReminder();
+            }
+        });
+    </script>
+</body>
+</html>
